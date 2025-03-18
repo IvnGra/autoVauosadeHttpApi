@@ -1,80 +1,88 @@
-const express = require('express');
-const csv = require('csv-parser');
 const fs = require('fs');
-const net = require('net');
+const csv = require('csv-parser');
+const express = require('express');
 
-// Variables
-const results = [];
-const HTTP_PORT = 3000;   // HTTP server will run on this port
-const TCP_PORT = 4000;    // TCP server will run on this port
+const inputFilePath = 'C:/Users/50709287030/Desktop/autoVauosadeHttpApi/LE.txt'; 
+const HTTP_PORT = 3000; // HTTP server port
 
-// Function to load and parse the CSV file into JSON
+const app = express();
+let results = []; // Store parsed CSV data
+
+// Function to load and parse CSV (TSV format)
 function loadCSVData() {
   return new Promise((resolve, reject) => {
-    fs.createReadStream('C:/Users/50709287030/Desktop/autoVauosadeHttpApi/LE.txt')
-      .pipe(csv())
+    const tempResults = [];
+    fs.createReadStream(inputFilePath)
+      .pipe(csv({ separator: '\t', headers: false })) // Set tab as separator
       .on('data', (data) => {
-        console.log('Data:', data);  // Log each parsed row
-        results.push(data);
+        tempResults.push({
+          serial: data[0]?.replace(/"/g, ''),  // Serial Number
+          name: data[1]?.replace(/"/g, ''),    // Product Name
+          price: data[9]?.replace(/"/g, ''),   // Price
+          brand: data[10]?.replace(/"/g, ''),  // Brand
+          total: data[11]?.replace(/"/g, '')   // Total
+        });
       })
       .on('end', () => {
-        console.log('CSV data parsed:', results);  // Log parsed results
-        resolve(); // Resolve when CSV parsing is complete
+        results = tempResults;
+        console.log(`CSV parsed successfully, ${results.length} items loaded.`);
+        resolve();
       })
       .on('error', (err) => {
-        console.error('Error parsing CSV file:', err);
-        reject(err); // Reject if there is an error reading the file
+        console.error('Error reading CSV file:', err);
+        reject(err);
       });
   });
 }
 
-// Create an Express HTTP server
-const app = express();
-
-// HTTP route to serve the parsed CSV data as JSON
+//  Default homepage route
 app.get('/', (req, res) => {
-  if (results.length > 0) {
-    console.log('Sending JSON data');
-    res.json(results);  // Send the JSON data when the HTTP route is accessed
+  res.send(`
+    <h1>CSV to JSON </h1>
+    <ul>
+      <li><a href="/data">View All Data</a></li>
+      <li><a href="/search?serial=">Search by Serial</a></li>
+      <li><a href="/search?name=">Search by Name</a></li>
+    </ul>
+  `);
+});
+
+//  Get all data
+app.get('/data', (req, res) => {
+  res.json(results);
+});
+
+//  Search by serial or name
+app.get('/search', (req, res) => {
+  const { serial, name } = req.query;
+  let filteredResults = results;
+
+  if (serial) {
+    filteredResults = filteredResults.filter(item =>
+      item.serial && item.serial.toLowerCase().includes(serial.toLowerCase())
+    );
+  }
+
+  if (name) {
+    filteredResults = filteredResults.filter(item =>
+      item.name && item.name.toLowerCase().includes(name.toLowerCase())
+    );
+  }
+
+  if (filteredResults.length > 0) {
+    res.json(filteredResults);
   } else {
-    console.log('No data found');
-    res.status(500).send('Error: No data available');
+    res.status(404).send('No matching data found');
   }
 });
 
-// Start the TCP server
-const server = net.createServer((socket) => {
-  console.log('Client connected:', socket.remoteAddress, socket.remotePort);
-
-  // Send the JSON data to the client upon connection
-  socket.write(JSON.stringify(results)); // Send parsed JSON as string
-
-  // Handle incoming data from the client
-  socket.on('data', (data) => {
-    console.log('Received:', data.toString());
-    // Optionally, you can respond to the client
-    socket.write('Tere tulemast serverisse');
-  });
-
-  // Handle client disconnection
-  socket.on('end', () => {
-    console.log('Client disconnected');
-  });
-});
-
-// Start the TCP server
-server.listen(TCP_PORT, '0.0.0.0', () => {
-  console.log(`TCP Server listening on port ${TCP_PORT}`);
-});
-
-// Load the CSV data and start the HTTP server once the data is ready
+//  Load CSV and start server
 loadCSVData()
   .then(() => {
-    // Start the HTTP server only after the CSV data has been loaded
     app.listen(HTTP_PORT, () => {
-      console.log(`HTTP Server is running at http://localhost:${HTTP_PORT}`);
+      console.log(` Server running at http://localhost:${HTTP_PORT}`);
     });
   })
   .catch((error) => {
-    console.error('Failed to load CSV data:', error);
+    console.error(' Failed to load CSV data:', error);
   });
