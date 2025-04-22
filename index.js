@@ -3,7 +3,7 @@ const csv = require('csv-parser');
 const express = require('express');
 
 const inputFilePath = 'C:/Users/50709287030/Desktop/autoVauosadeHttpApi/LE.txt'; 
-const HTTP_PORT = 3000; // HTTP server port
+const port = 3000; // HTTP server port
 
 const app = express();
 let results = []; // Store parsed CSV data
@@ -18,9 +18,9 @@ function loadCSVData() {
         tempResults.push({
           serial: data[0]?.replace(/"/g, ''),  // Serial Number
           name: data[1]?.replace(/"/g, ''),    // Product Name
-          price: data[9]?.replace(/"/g, ''),   // Price
-          brand: data[10]?.replace(/"/g, ''),  // Brand
-          total: data[11]?.replace(/"/g, '')   // Total
+          priceBeforeKM: data[8]?.replace(/"/g, ''),   // Price before KM
+          brand: data[9]?.replace(/"/g, ''), // Brand
+          priceAfterKM: data[10]?.replace(/"/g, '')   // after KM
         });
       })
       .on('end', () => {
@@ -57,15 +57,9 @@ app.get('/search', (req, res) => {
   const { serial, name } = req.query;
   let filteredResults = results;
 
-  if (serial) {
+  if (serial,name) {
     filteredResults = filteredResults.filter(item =>
-      item.serial && item.serial.toLowerCase().includes(serial.toLowerCase())
-    );
-  }
-
-  if (name) {
-    filteredResults = filteredResults.filter(item =>
-      item.name && item.name.toLowerCase().includes(name.toLowerCase())
+      item.serial && item.serial.toLowerCase().includes(serial.toLowerCase()) || item.name && item.name.toLowerCase().includes(name.toLowerCase())
     );
   }
 
@@ -79,8 +73,8 @@ app.get('/search', (req, res) => {
 //  Load CSV and start server
 loadCSVData()
   .then(() => {
-    app.listen(HTTP_PORT, () => {
-      console.log(` Server running at http://localhost:${HTTP_PORT}`);
+    app.listen(port, () => {
+      console.log(` Server running at http://localhost:${port}`);
     });
   })
   .catch((error) => {
