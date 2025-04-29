@@ -52,19 +52,42 @@ app.get('/data', (req, res) => {
   res.json(results);
 });
 
-//  Search by serial or name
+
 app.get('/search', (req, res) => {
-  const { serial, name } = req.query;
+  const { serial, name, search, page=1 } = req.query;
+  let limit = 30; // Safely parse limit from query
   let filteredResults = results;
 
-  if (serial,name) {
+  if (search) {
+    let searchLower = search.toLowerCase()
     filteredResults = filteredResults.filter(item =>
-      item.serial && item.serial.toLowerCase().includes(serial.toLowerCase()) || item.name && item.name.toLowerCase().includes(name.toLowerCase())
+      item.serial?.toLowerCase().includes(searchLower) ||
+      item.name?.toLowerCase().includes(searchLower)
     );
+  } else if (serial) {
+    filteredResults = filteredResults.filter(item =>
+      item.serial?.toLowerCase().includes(serial.toLowerCase())
+    );
+  } else if (name) {
+    filteredResults = filteredResults.filter(item =>
+      item.name?.toLowerCase().includes(name.toLowerCase())
+    );
+  } else {
+    return res.status(400).send('Please provide at least a "serial" or "name" query parameter.');
   }
 
-  if (filteredResults.length > 0) {
-    res.json(filteredResults);
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const newLimit = limit * page;
+  const paginatedResults = filteredResults.slice(startIndex, endIndex, newLimit);
+
+  if (paginatedResults.length > 0) {
+    res.json({
+      page,
+      totalResults: filteredResults.length,
+      totalPages: Math.ceil(filteredResults.length / limit),
+      data: paginatedResults
+    });
   } else {
     res.status(404).send('No matching data found');
   }
